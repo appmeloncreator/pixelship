@@ -1,0 +1,49 @@
+name: Apply brand-free generation policy
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-brand-policy.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update pipeline policy
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = 'pipeline.js';
+          let text = fs.readFileSync(path, 'utf8');
+          text = text.replace(
+            'Never invent brand names. If the user explicitly mentions a brand, product, or model name, keep its exact name only inside double quotation marks in the tool prompt.',
+            'Never output or repeat any brand, company, product-line, trademark, or model name in a tool prompt, even when the user supplied it. Replace every such name with a precise description of visible geometry, proportions, materials, controls, colors, markings, and construction details.'
+          );
+          text = text.replace(
+            'Never introduce a brand, company, product-line, or model name that the user did not explicitly mention. If the user explicitly mentioned one, preserve the exact name only inside double quotation marks.',
+            'Never output or repeat any brand, company, product-line, trademark, or model name, even when the user supplied it. Replace each name with precise visible geometry, proportions, materials, controls, colors, markings, and construction details.'
+          );
+          text = text.replace("Original prompts: '+originalPrompts+'\\nRequested edit/composition:", "Requested edit/composition:");
+          text = text.replace(". Original image prompt: '+originalPrompt+'. The ", ". The ");
+          text = text.replace("+(isEdit?' Original image prompt: '+originalPrompt+'. Preserve recognizable unchanged regions and apply only the requested edit.':'')", "+(isEdit?' Preserve recognizable unchanged regions and apply only the requested edit.':'')");
+          text = text.replace(
+            'Never drift toward an older or generic version. Do not explain.',
+            'Never drift toward an older or generic version. NEVER output or repeat brand, company, trademark, product-line, or model names; describe only visible geometry and physical details. Do not explain.'
+          );
+          if (text.includes('keep its exact name') || text.includes("Original image prompt: '+originalPrompt")) {
+            throw new Error('Brand policy replacement was incomplete');
+          }
+          fs.writeFileSync(path, text);
+          NODE
+      - name: Commit policy
+        run: |
+          rm .github/workflows/apply-brand-policy.yml
+          git config user.name "Pixelship Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add pipeline.js .github/workflows/apply-brand-policy.yml
+          git commit -m "Remove brand names from generation prompts"
+          git push
