@@ -1,0 +1,27 @@
+name: Apply icon-only search
+on:
+  push:
+    paths: [.github/workflows/icon-only-search.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');
+          let p=fs.readFileSync('pipeline.js','utf8');
+          const start=p.indexOf('async function webSearchDecision('),end=p.indexOf('async function selectWebReference(',start);if(start<0||end<0)throw new Error('Search gate missing');
+          const fn="async function webSearchDecision(prompt,force=false){if(!force)return null;const verdict=(await run(CHAT_MODEL,{prompt:'A visual web reference is REQUIRED for this image request: '+prompt+'\\nReply exactly SEARCH: followed only by the canonical subject name, brand, and exact model. Remove scene, style, action, mood, and words such as futuristic. Never replace a requested generation/model number with an older one. You are not allowed to reply NO.',system_prompt:'You extract an exact image-search query. Search is already mandatory. Preserve model numbers and version names exactly. Reply only SEARCH: query.'})).trim(),match=verdict.match(/^SEARCH\\s*:\\s*(.+)$/i);return match?match[1].trim():prompt}\n";
+          p=p.slice(0,start)+fn+p.slice(end);fs.writeFileSync('pipeline.js',p);
+          let b=fs.readFileSync('supabase-backend.js','utf8');b=b.replace('if(!sourceUrls.length){const previous=','if(!sourceUrls.length&&body.webSearch!==true){const previous=');fs.writeFileSync('supabase-backend.js',b);
+          NODE
+      - run: |
+          rm .github/workflows/icon-only-search.yml
+          git config user.name "Pixelship Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add pipeline.js supabase-backend.js .github/workflows/icon-only-search.yml
+          git commit -m "Make search icon authoritative"
+          git push
