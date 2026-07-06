@@ -1,0 +1,34 @@
+name: Limit Supabase auth wait
+on:
+  push:
+    paths:
+      - .github/workflows/limit-supabase-auth-wait.yml
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'supabase-backend.js';
+          let s = fs.readFileSync(path, 'utf8');
+          const oldText = "const TRANSIENT=new Set([408,425,429,500,502,503,504]);const wait=ms=>new Promise(r=>setTimeout(r,ms));async function fetchResilient(url,opt={}){let n=0;for(;;){try{const r=await fetch(url,opt);if(!TRANSIENT.has(r.status))return r;const after=Number(r.headers.get('retry-after'));await r.text().catch(()=>{});await wait(Number.isFinite(after)&&after>0?after*1000:Math.min(30000,1000*2**Math.min(n++,5)))}catch(e){if(!/timeout|timed out|fetch failed|ECONNRESET|ECONNREFUSED|ENETUNREACH|EAI_AGAIN|UND_ERR/i.test(String(e?.message||e)))throw e;await wait(Math.min(30000,1000*2**Math.min(n++,5)))}}}";
+          const newText = "const TRANSIENT=new Set([408,425,429,500,502,503,504]);const wait=ms=>new Promise(r=>setTimeout(r,ms));async function fetchResilient(url,opt={}){const timeoutMs=opt.timeoutMs||12000,maxRetries=opt.maxRetries??2,fetchOpt={...opt};delete fetchOpt.timeoutMs;delete fetchOpt.maxRetries;let n=0;for(;;){const ctl=new AbortController(),timer=setTimeout(()=>ctl.abort(),timeoutMs);try{const r=await fetch(url,{...fetchOpt,signal:ctl.signal});clearTimeout(timer);if(!TRANSIENT.has(r.status)||n>=maxRetries)return r;const after=Number(r.headers.get('retry-after'));await r.text().catch(()=>{});await wait(Number.isFinite(after)&&after>0?after*1000:Math.min(4000,750*2**n));n++}catch(e){clearTimeout(timer);if(!/AbortError|timeout|timed out|fetch failed|ECONNRESET|ECONNREFUSED|ENETUNREACH|EAI_AGAIN|UND_ERR/i.test(String(e?.name||'')+' '+String(e?.message||e))||n>=maxRetries)throw new Error('Supabase request timed out or failed. Check your SUPABASE_URL and internet connection.');await wait(Math.min(4000,750*2**n));n++}}}";
+          if (!s.includes(oldText)) throw new Error('target helper not found');
+          s = s.replace(oldText, newText);
+          fs.writeFileSync(path, s);
+          NODE
+      - run: node --check supabase-backend.js
+      - run: rm .github/workflows/limit-supabase-auth-wait.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase-backend.js .github/workflows/limit-supabase-auth-wait.yml
+          git commit -m "Limit Supabase auth request waits"
+          git push
