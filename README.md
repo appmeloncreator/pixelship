@@ -39,7 +39,23 @@ Build the image without embedding secrets:
 
 ```powershell
 docker build -t pixelship-self-hosted .
-docker run --rm -p 3000:3000 --mount type=bind,source="$((Get-Location).Path)\config.env",target=/app/config.env,readonly pixelship-self-hosted
 ```
 
-On Linux/macOS, use `-v "$(pwd)/config.env:/app/config.env:ro` instead.
+Run it from PowerShell:
+
+```powershell
+$ConfigPath = Join-Path (Get-Location) "config.env"
+docker run --rm -p 3000:3000 --mount "type=bind,source=$ConfigPath,target=/app/config.env,readonly" pixelship-self-hosted
+```
+
+Run it from Windows Command Prompt:
+
+```cmd
+docker run --rm -p 3000:3000 --mount type=bind,source="%cd%\config.env",target=/app/config.env,readonly pixelship-self-hosted
+```
+
+Run it from Linux/macOS:
+
+```bash
+docker run --rm -p 3000:3000 --mount type=bind,source="$(pwd)/config.env",target=/app/config.env,readonly pixelship-self-hosted
+```
