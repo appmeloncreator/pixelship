@@ -1,0 +1,29 @@
+name: Apply Kontext visible-text policy
+on:
+  push:
+    paths: [.github/workflows/kontext-visible-text-policy.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');let t=fs.readFileSync('pipeline.js','utf8');
+          const old="enhanced=await run(CHAT_MODEL,{prompt:(isEdit?'Multi-reference edit instructions: ':'User description: ')+prompt+'\\nEnhanced prompt:',system_prompt:ENHANCER}),blueprint=await validateBlueprint";
+          const next="enhanced=await run(CHAT_MODEL,{prompt:(isEdit?'Multi-reference edit instructions: ':'User description: ')+prompt+'\\nEnhanced prompt:',system_prompt:ENHANCER}),kontextPrompt=await run(CHAT_MODEL,{prompt:'Internal prompt: '+enhanced+'\\nKontext-safe prompt:',system_prompt:'Rewrite only for the final Kontext image model. Do not include brand, company, product-line, trademark, or model names as the identity of an object. Replace a named object with the exact object shown in the supplied reference image and preserve the requested scene and composition. Exception: when the user explicitly wants visible lettering, a logo word, screen text, label, or brand text to appear inside the image, keep only that exact visible text inside double quotation marks. Never state the product name merely to identify the object. Return only the rewritten prompt.'}),blueprint=await validateBlueprint";
+          if(!t.includes(old))throw new Error('Insertion point missing');t=t.replace(old,next);
+          t=t.replace("then follow this requested scene and composition: '+enhanced+","then follow this requested scene and composition: '+kontextPrompt+");
+          t=t.replace("according to this instruction: '+enhanced+","according to this instruction: '+kontextPrompt+");
+          t=t.replace("Generation prompt: '+enhanced+","Generation prompt: '+kontextPrompt+");
+          fs.writeFileSync('pipeline.js',t);
+          NODE
+      - run: |
+          rm .github/workflows/kontext-visible-text-policy.yml
+          git config user.name "Pixelship Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add pipeline.js .github/workflows/kontext-visible-text-policy.yml
+          git commit -m "Limit product names in Kontext prompts"
+          git push
