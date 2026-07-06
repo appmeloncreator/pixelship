@@ -1,0 +1,26 @@
+name: Persist collage across retries
+on:
+  push:
+    paths: [.github/workflows/persist-collage-retries.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');let t=fs.readFileSync('pipeline.js','utf8');
+          const old="model=usesReferencePath?EDIT_MODEL:RENDER_MODEL,isRevision=attempt>0,inputImage=isRevision?decoded.dataUrl:usesReferencePath?collage.dataUrl:decoded.dataUrl,input={prompt:attemptPrompt,input_image:inputImage";
+          const next="model=usesReferencePath?EDIT_MODEL:RENDER_MODEL,inputImage=usesReferencePath?collage.dataUrl:decoded.dataUrl,input={prompt:attemptPrompt,input_image:inputImage";
+          if(!t.includes(old))throw new Error('Retry image selection missing');
+          fs.writeFileSync('pipeline.js',t.replace(old,next));
+          NODE
+      - run: |
+          rm .github/workflows/persist-collage-retries.yml
+          git config user.name "Pixelship Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add pipeline.js .github/workflows/persist-collage-retries.yml
+          git commit -m "Keep reference collage across retries"
+          git push
