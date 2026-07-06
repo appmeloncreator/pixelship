@@ -1,0 +1,28 @@
+name: Apply stable retry prompt
+on:
+  push:
+    paths: [.github/workflows/stable-retry-prompt.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');let t=fs.readFileSync('pipeline.js','utf8');
+          const old="let selected,quality,candidates=[];for(let attempt=0;attempt<MAX_RENDER_ATTEMPTS;attempt++){const seed=Math.floor(Math.random()*2147483647),model=usesReferencePath?EDIT_MODEL:RENDER_MODEL,editPrompt=usesReferencePath&&attempt>0?rendererPrompt:referencePrompt,isRevision=attempt>0,inputImage=isRevision?decoded.dataUrl:usesReferencePath?collage.dataUrl:decoded.dataUrl,input={prompt:usesReferencePath?editPrompt:rendererPrompt,input_image:inputImage";
+          const next="let selected,quality,candidates=[],attemptPrompt=usesReferencePath?referencePrompt:rendererPrompt;for(let attempt=0;attempt<MAX_RENDER_ATTEMPTS;attempt++){const seed=Math.floor(Math.random()*2147483647),model=usesReferencePath?EDIT_MODEL:RENDER_MODEL,isRevision=attempt>0,inputImage=isRevision?decoded.dataUrl:usesReferencePath?collage.dataUrl:decoded.dataUrl,input={prompt:attemptPrompt,input_image:inputImage";
+          if(!t.includes(old))throw new Error('Retry loop missing');t=t.replace(old,next);
+          const revise="if(attempt+1>=MAX_RENDER_ATTEMPTS)break;rendererPrompt=await reviseRendererPrompt({originalPrompt:judgePrompt,currentPrompt:usesReferencePath?editPrompt:rendererPrompt,correction:quality.correction||quality.result,failedImage:url,isEdit:usesReferencePath,referenceImages:isEdit?contexts.map(context=>context.url):webReference?[webReference.image]:[]})";
+          if(!t.includes(revise))throw new Error('Revision rewrite missing');t=t.replace(revise,'if(attempt+1>=MAX_RENDER_ATTEMPTS)break');
+          fs.writeFileSync('pipeline.js',t);
+          NODE
+      - run: |
+          rm .github/workflows/stable-retry-prompt.yml
+          git config user.name "Pixelship Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add pipeline.js .github/workflows/stable-retry-prompt.yml
+          git commit -m "Reuse the same prompt for retry attempts"
+          git push
