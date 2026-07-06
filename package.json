@@ -1,0 +1,11 @@
+{
+  "name": "pixelship-self-hosted",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "sharp": "^0.35.3"
+  }
+}
