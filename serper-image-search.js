@@ -57,6 +57,11 @@ async function cleanImage(imageUrl) {
   finally { clearTimeout(timer); }
 }
 
+function isMerchResult(item) {
+  const text = [item.title, item.link, item.source].filter(Boolean).join(' ').toLowerCase();
+  return /\b(merch|merchandise|t-?shirt|tee|hoodie|sweatshirt|poster|art print|sticker|decal|mug|phone case|case cover|skin|costume|plush|plushie|figurine|keychain|lanyard|wall art)\b/i.test(text);
+}
+
 async function searchImages(query) {
   const key = env().SERPER_API_KEY;
   if (!key) throw new Error('Serper image search is not configured. Add SERPER_API_KEY to .env.');
@@ -70,17 +75,18 @@ async function searchImages(query) {
   const results = [];
   const requiredNumbers = query.match(/\b\d+(?:[.-]\d+)*\b/g) || [];
   const exactCandidates = (data.images || []).filter(item => {
+    if (isMerchResult(item)) return false;
     const titleNumbers = String(item.title || '').match(/\b\d+(?:[.-]\d+)*\b/g) || [];
     return requiredNumbers.every(number => titleNumbers.includes(number));
   });
-  if (requiredNumbers.length && !exactCandidates.length) throw new Error('No recent image result matched the exact requested model/version number: ' + requiredNumbers.join(', '));
+  if (requiredNumbers.length && !exactCandidates.length) throw new Error('No non-merchandise image result matched the exact requested model/version number: ' + requiredNumbers.join(', '));
   for (const item of exactCandidates) {
     const image = await cleanImage(item.imageUrl);
     if (!image) continue;
     results.push({ image, title: String(item.title || ''), source: safeHttpUrl(item.link) || '' });
     if (results.length === 5) break;
   }
-  if (!results.length) throw new Error('Serper returned results, but none were valid JPEG, PNG, WebP, or GIF images');
+  if (!results.length) throw new Error('Serper returned results, but none were valid non-merchandise JPEG, PNG, WebP, or GIF images');
   return results;
 }
 
