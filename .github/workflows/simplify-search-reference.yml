@@ -1,0 +1,30 @@
+name: Simplify search references
+on:
+  push:
+    paths: [.github/workflows/simplify-search-reference.yml]
+permissions:
+  contents: write
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          node <<'NODE'
+          const fs=require('fs');let t=fs.readFileSync('pipeline.js','utf8');
+          t=t.replace('Preserve any brand, company, product-line, trademark, or model name exactly when the user supplied it so visual-reference search can identify the correct subject. Never invent a name the user did not provide.','Never invent brand names. If the user explicitly mentions a brand, product, or model name, keep its exact name only inside double quotation marks in the tool prompt.');
+          t=t.replace('Preserve any brand, company, product-line, trademark, or model name exactly when the user supplied it so search and planning identify the correct subject. Never invent a name the user did not provide.','Never introduce a brand, company, product-line, or model name that the user did not explicitly mention. If the user explicitly mentioned one, preserve the exact name only inside double quotation marks.');
+          const start=t.indexOf('async function selectWebReference('),end=t.indexOf('async function validateBlueprint(',start);if(start<0||end<0)throw new Error('Search function missing');t=t.slice(0,start)+"async function selectWebReference(prompt,force=false){const query=await webSearchDecision(prompt,force);if(!query)return null;const results=await searchImages(query),chosen=results[0];return{...chosen,query,candidates:results.length}}\n"+t.slice(end);
+          const old="enhanced=await run(CHAT_MODEL,{prompt:(isEdit?'Multi-reference edit instructions: ':'User description: ')+prompt+'\\nEnhanced prompt:',system_prompt:ENHANCER}),kontextPrompt=await run(CHAT_MODEL,{prompt:'Internal planning prompt: '+enhanced+(webReference?'\\nVerified visual reference details: '+webReference.visualDescription:'')+'\\nRewrite for Kontext:',system_prompt:'Return only a complete image-generation prompt. Remove every brand, company, trademark, product-line, and model name. Replace each removed name with concrete visible geometry, proportions, materials, controls, colors, markings, and construction details. Preserve the requested scene, pose, composition, text, and background. Do not mention that names were removed.'}),blueprint=await validateBlueprint";
+          const next="enhanced=await run(CHAT_MODEL,{prompt:(isEdit?'Multi-reference edit instructions: ':'User description: ')+prompt+'\\nEnhanced prompt:',system_prompt:ENHANCER}),blueprint=await validateBlueprint";if(!t.includes(old))throw new Error('Rewrite block missing');t=t.replace(old,next);
+          t=t.replace("'Create a new image using the supplied reference pixels and this exact visible-design specification: '+webReference.visualDescription+'. Treat those physical details as hard requirements. Do not use a memorized or older-generation design, even if the product name suggests one. Follow this requested scene and composition: '+kontextPrompt+'. Use the blueprint panel for layout and palette. Do not copy the source background, watermark, or unrelated text.'","'Use the supplied image as a normal visual reference for the subject. Match what is visibly present in that reference, then follow this requested scene and composition: '+enhanced+'. Use the blueprint panel for layout and palette. Do not copy the source background, watermark, or unrelated text.'");
+          t=t.replace("according to this instruction: '+kontextPrompt+","according to this instruction: '+enhanced+");t=t.replace("Generation prompt: '+kontextPrompt+","Generation prompt: '+enhanced+");t=t.replace("Concrete visible design specification: '+webReference.visualDescription+'. Do not fall back to a memorized older product design. ","Treat the supplied web image as a normal visual reference. ");
+          fs.writeFileSync('pipeline.js',t);
+          NODE
+      - run: |
+          rm .github/workflows/simplify-search-reference.yml
+          git config user.name "Pixelship Automation"
+          git config user.email "actions@users.noreply.github.com"
+          git add pipeline.js .github/workflows/simplify-search-reference.yml
+          git commit -m "Simplify search reference handling"
+          git push
