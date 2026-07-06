@@ -6,11 +6,12 @@ This directory is independent from the hosted Pixelship project. It reads creden
 ## Setup
 
 1. Create a Supabase project.
-2. Docker automatically applies these migrations on startup (manual installs may run them in SQL Editor):
+2. Pixelship automatically applies these migrations on startup with either npm or Docker (manual installs may run them in SQL Editor):
    - `supabase/schema.sql`
    - `supabase/002_private_by_default.sql`
    - `supabase/003_conversations.sql`
    - `supabase/004_content.sql`
+   - `supabase/005_custom_aspect_ratios.sql`
 3. Open `config.env` and replace the placeholders with your own Replicate and Supabase credentials.
 4. Install and start:
 
@@ -19,7 +20,7 @@ npm.cmd install
 npm.cmd start
 ```
 
-Open `http://localhost:3000`. Change `PORT` in `config.env` when needed. The server binds to `0.0.0.0` for Docker, LAN, and VPS hosting. Docker checks and configures the Supabase schema, policies, triggers, private Storage bucket, and content tables before every launch; completed migrations are recorded and not rerun.
+Open `http://localhost:3000`. Change `PORT` in `config.env` when needed. The server binds to IPv6/IPv4 localhost and LAN-friendly addresses where your OS allows it. Startup checks and configures the Supabase schema, policies, triggers, private Storage bucket, and content tables; completed migrations are recorded and not rerun.
 
 ## Required configuration
 
