@@ -1,0 +1,41 @@
+name: Use Replicate Gemini image renderer
+on:
+  push:
+    paths:
+      - .github/workflows/use-replicate-gemini-image.yml
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          let s=fs.readFileSync('pipeline.js','utf8');
+          s=s.replace("const CHAT_MODEL='openai/gpt-4.1',PLAN_MODEL='openai/gpt-5.4',IMAGE_MODEL='gemini-2.5-flash-image';", "const CHAT_MODEL='openai/gpt-4.1',PLAN_MODEL='openai/gpt-5.4',IMAGE_MODEL='google/gemini-2.5-flash-image';");
+          s=s.replace(/function dataUrlToGeminiImage\(dataUrl\)[\s\S]*?throw new Error\('Gemini response did not include output_image'\)}(?=function demoSvg)/, '');
+          const old="const seed=Math.floor(Math.random()*2147483647),imageInput=usesReferencePath?collage.dataUrl:decoded.dataUrl;const url=await runGeminiImage(attemptPrompt+'\\nRetry seed: '+seed,imageInput,aspect)";
+          const newer="const seed=Math.floor(Math.random()*2147483647),imageInput=usesReferencePath?collage.dataUrl:decoded.dataUrl,input={prompt:attemptPrompt+'\\nRetry seed: '+seed,image_input:[imageInput],aspect_ratio:usesReferencePath?'match_input_image':aspect,output_format:'jpg'};const url=await run(IMAGE_MODEL,input)";
+          if(!s.includes(newer)){
+            if(!s.includes(old)) throw new Error('render call target not found');
+            s=s.replace(old,newer);
+          }
+          fs.writeFileSync('pipeline.js',s);
+          let env=fs.readFileSync('config.env.example','utf8');
+          env=env.replace(/^GEMINI_API_KEY=.*\n?/gm,'');
+          env=env.replace(/# Required: Replicate chat\/planning generation \(image rendering uses Gemini\)/g,'# Required: Replicate chat/planning and Gemini image rendering');
+          fs.writeFileSync('config.env.example',env);
+          NODE
+      - run: node --check pipeline.js
+      - run: rm .github/workflows/use-replicate-gemini-image.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline.js config.env.example .github/workflows/use-replicate-gemini-image.yml
+          git commit -m "Use Replicate Gemini 2.5 image renderer"
+          git push
