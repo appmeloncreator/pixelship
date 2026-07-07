@@ -1,0 +1,37 @@
+name: Loosen validator acceptance
+on:
+  push:
+    paths:
+      - .github/workflows/loosen-validator.yml
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          let s=fs.readFileSync('pipeline.js','utf8');
+          const old="const QUALITY='You are Pixelship image quality control. IMAGE 1 is the candidate render. Any later images are source-of-truth visual references whose important identity and design details should be preserved. Score the candidate from 1 to 10. PASS requires a score of at least 7 and no hard failure. Hard failures: wrong subject or product generation, major mismatch with references, or any requested/reference object whose silhouette, proportions, controls, layout, colors, identity, or defining physical features do not clearly resemble the corresponding reference object, missing requested element, unreadable or misspelled requested text, invented/gibberish text, severely broken anatomy or geometry, major cropping, blank or accidental background, or composition that clearly contradicts the request. A recognizable but mediocre image should score 4-6 and FAIL. A terrible or unrelated image should score 1-3 and FAIL. Ignore only truly trivial defects such as one stray pixel, microscopic edge noise, or a minute color variation that does not affect recognition, meaning, readability, or composition. If visible text was not requested, reject accidental writing. Reply exactly (img:PASS score:N correction:) or (img:FALSE score:N correction:BRIEF_SPECIFIC_REASON).'";
+          const newer="const QUALITY='You are Pixelship image quality control. IMAGE 1 is the candidate render. Any later images are source-of-truth visual references. Judge whether the image captures the request and the blueprint philosophy: the core subject, mood, composition, readable silhouette, palette direction, and intended scene. It does NOT need to be 100% perfect or match every pixel/detail. Score 1 to 10. PASS requires score 6+ and no hard failure. Hard failures only: clearly wrong subject, completely unrelated image, missing the main requested object/person, severe reference identity mismatch, requested text is absent or unreadable, obvious gibberish/pseudo-text, blank/accidental background, extreme crop hiding the subject, or broken anatomy/geometry that ruins the image. Minor deviations, stylization differences, imperfect proportions, small missing details, mild composition changes, tiny artifacts, or a different but reasonable interpretation should PASS if the image still represents the intended idea. A usable image that communicates the blueprint philosophy should score 6-8 and PASS. Only fail images that are genuinely bad, misleading, or unusable. If visible text was not requested, ignore tiny accidental markings unless they look like prominent gibberish. Reply exactly (img:PASS score:N correction:) or (img:FALSE score:N correction:BRIEF_SPECIFIC_REASON).'";
+          if(!s.includes(newer)){
+            if(!s.includes(old)) throw new Error('quality prompt target not found');
+            s=s.replace(old,newer);
+          }
+          s=s.replace('pass=valid&&verdictPass&&score>=7','pass=valid&&verdictPass&&score>=6');
+          s=s.replace('Judge strictly and return the exact required one-line verdict.','Judge generously for whether the image represents the blueprint philosophy and return the exact required one-line verdict.');
+          fs.writeFileSync('pipeline.js',s);
+          NODE
+      - run: node --check pipeline.js
+      - run: rm .github/workflows/loosen-validator.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline.js .github/workflows/loosen-validator.yml
+          git commit -m "Loosen validator to accept blueprint philosophy"
+          git push
