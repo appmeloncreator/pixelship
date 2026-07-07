@@ -1,0 +1,37 @@
+name: Use FLUX Pro for text generation
+on:
+  push:
+    paths:
+      - .github/workflows/use-flux-pro-text.yml
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const p='pipeline.js';
+          let s=fs.readFileSync(p,'utf8');
+          s=s.replace("RENDER_MODEL='black-forest-labs/flux-kontext-pro',EDIT_MODEL='black-forest-labs/flux-kontext-pro'", "RENDER_MODEL='black-forest-labs/flux-1.1-pro',EDIT_MODEL='black-forest-labs/flux-kontext-pro'");
+          const old="const seed=Math.floor(Math.random()*2147483647),model=usesReferencePath?EDIT_MODEL:RENDER_MODEL,inputImage=usesReferencePath?collage.dataUrl:decoded.dataUrl,input={prompt:attemptPrompt,input_image:inputImage,aspect_ratio:'match_input_image',output_format:'png',safety_tolerance:2,seed};const url=await run(model,input)";
+          const neu="const seed=Math.floor(Math.random()*2147483647),model=usesReferencePath?EDIT_MODEL:RENDER_MODEL,input=usesReferencePath?{prompt:attemptPrompt,input_image:collage.dataUrl,aspect_ratio:'match_input_image',output_format:'png',safety_tolerance:2,seed}:{prompt:attemptPrompt,aspect_ratio:aspect,output_format:'png',safety_tolerance:2,seed};const url=await run(model,input)";
+          if(!s.includes(neu)){
+            if(!s.includes(old)) throw new Error('render routing target not found');
+            s=s.replace(old,neu);
+          }
+          fs.writeFileSync(p,s);
+          NODE
+      - run: node --check pipeline.js
+      - run: rm .github/workflows/use-flux-pro-text.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline.js .github/workflows/use-flux-pro-text.yml
+          git commit -m "Use FLUX 1.1 Pro for text generation"
+          git push
