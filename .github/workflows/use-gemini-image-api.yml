@@ -1,0 +1,54 @@
+name: Use Gemini image API
+on:
+  push:
+    paths:
+      - .github/workflows/use-gemini-image-api.yml
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          let s=fs.readFileSync('pipeline.js','utf8');
+          s=s.replace(/const CHAT_MODEL='openai\/gpt-4\.1',PLAN_MODEL='openai\/gpt-5\.4',RENDER_MODEL='[^']+',EDIT_MODEL='[^']+';/, "const CHAT_MODEL='openai/gpt-4.1',PLAN_MODEL='openai/gpt-5.4',IMAGE_MODEL=process.env.GEMINI_IMAGE_MODEL||'gemini-3.1-flash-image';");
+          if(!s.includes('function dataUrlToGeminiImage(')){
+            const marker='function demoSvg(prompt,seed)';
+            const add="function dataUrlToGeminiImage(dataUrl){const match=String(dataUrl||'').match(/^data:(image\\/[a-z0-9.+-]+);base64,(.+)$/i);if(!match)throw new Error('Expected a base64 image data URL for Gemini image input');return{type:'image',mime_type:match[1],data:match[2]}}function outputAsDataUrl(image){if(!image?.data)throw new Error('Gemini did not return an image');return'data:'+(image.mime_type||image.mimeType||'image/png')+';base64,'+image.data}async function runGeminiImage(prompt,imageDataUrl,aspect='1:1'){const key=process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY;if(!key)throw new Error('Set GEMINI_API_KEY in your environment');const input=[{type:'text',text:prompt}];if(imageDataUrl)input.push(dataUrlToGeminiImage(imageDataUrl));const response=await retryFetch('https://generativelanguage.googleapis.com/v1beta/interactions',{method:'POST',headers:{'x-goog-api-key':key,'Content-Type':'application/json'},body:JSON.stringify({model:IMAGE_MODEL,input,response_format:{type:'image',mime_type:'image/png',aspect_ratio:aspect}})},IMAGE_MODEL+' image');const data=await responseJson(response);if(!response.ok)throw new Error(data.error?.message||data.error||data.text||'Gemini image request failed');const image=data.output_image||data.outputImage;if(image)return outputAsDataUrl(image);const steps=Array.isArray(data.steps)?data.steps:[],found=steps.flatMap(step=>step.output||step.outputs||step.content||[]).find(part=>part?.type==='image'||part?.data&&/image/i.test(part.mime_type||part.mimeType||''));if(found)return outputAsDataUrl(found);throw new Error('Gemini response did not include output_image')}";
+            if(!s.includes(marker)) throw new Error('demoSvg marker missing');
+            s=s.replace(marker,add+marker);
+          }
+          const old="const seed=Math.floor(Math.random()*2147483647),model=usesReferencePath?EDIT_MODEL:RENDER_MODEL,input=usesReferencePath?{prompt:attemptPrompt,input_image:collage.dataUrl,aspect_ratio:'match_input_image',output_format:'png',safety_tolerance:2,seed}:{prompt:attemptPrompt,aspect_ratio:aspect,output_format:'png',safety_tolerance:2,seed};const url=await run(model,input)";
+          const newer="const seed=Math.floor(Math.random()*2147483647),imageInput=usesReferencePath?collage.dataUrl:decoded.dataUrl;const url=await runGeminiImage(attemptPrompt+'\\nRetry seed: '+seed,imageInput,aspect)";
+          if(!s.includes(newer)){
+            if(!s.includes(old)) throw new Error('render call target not found');
+            s=s.replace(old,newer);
+          }
+          s=s.replace("mode:isEdit?'replicate-edit':hasWebReference?'replicate-web-reference':'replicate'", "mode:isEdit?'gemini-edit':hasWebReference?'gemini-web-reference':'gemini'");
+          s=s.replace(/Kontext/g,'Gemini');
+          s=s.replace('Gemini-safe prompt before blueprint','Image-model-safe prompt before blueprint');
+          fs.writeFileSync('pipeline.js',s);
+          NODE
+      - run: node --check pipeline.js
+      - run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const p='config.env.example';
+          let s=fs.readFileSync(p,'utf8');
+          s=s.replace('# Required: Replicate image/chat generation','# Required: Replicate chat/planning generation (image rendering uses Gemini)');
+          if(!s.includes('GEMINI_API_KEY=')) s=s.replace(/REPLICATE_API_TOKEN=.*\n/, m=>m+'GEMINI_API_KEY=your_google_ai_api_key\nGEMINI_IMAGE_MODEL=gemini-3.1-flash-image\n');
+          fs.writeFileSync(p,s);
+          NODE
+      - run: rm .github/workflows/use-gemini-image-api.yml
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pipeline.js config.env.example .github/workflows/use-gemini-image-api.yml
+          git commit -m "Use Gemini image API for all image rendering"
+          git push
