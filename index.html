@@ -259,38 +259,46 @@
       object-fit:contain;
       background:#090a0c
       }
-      .process-stack {
-      display:grid;
-      gap:10px;
-      margin-bottom:10px
-      }
-      .process-card {
+      .process-stage {
       position:relative;
       overflow:hidden;
+      margin-bottom:10px;
       border:1px solid #ffffff18;
-      background:#08090b;
-      animation:processFade .55s ease both
+      background:#050608;
+      min-height:260px
       }
-      .process-card img {
-      display:block;
+      .process-frame {
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      opacity:0;
+      animation:processSwap 1.35s ease both
+      }
+      .process-frame img {
       width:100%;
-      max-height:260px;
+      height:100%;
+      max-height:560px;
       object-fit:contain;
       background:#050608
       }
-      .process-card.blur img {
+      .process-frame.blur img {
       filter:blur(9px) saturate(1.2);
       transform:scale(1.035);
-      opacity:.72
+      opacity:.74
       }
-      .process-card.blur::after {
+      .process-frame.blur::after {
       content:"";
       position:absolute;
       inset:0;
-      background:linear-gradient(180deg,#05060833,#050608aa)
+      background:linear-gradient(180deg,#05060822,#050608aa)
       }
-      .process-card.final img {
-      max-height:560px;
+      .process-frame.final {
+      position:relative;
+      opacity:1;
+      animation:processFinal .55s ease both
+      }
+      .process-frame.final img {
       filter:none;
       transform:none;
       opacity:1
@@ -309,17 +317,14 @@
       text-transform:uppercase;
       backdrop-filter:blur(10px)
       }
-      @keyframes processFade {
-      from {
-      opacity:0;
-      transform:translateY(10px);
-      filter:blur(14px)
+      @keyframes processSwap {
+      0% {opacity:0;transform:scale(1.025);filter:blur(16px)}
+      18%,72% {opacity:1;transform:none;filter:none}
+      100% {opacity:0;transform:scale(.985);filter:blur(16px)}
       }
-      to {
-      opacity:1;
-      transform:none;
-      filter:none
-      }
+      @keyframes processFinal {
+      from {opacity:0;transform:translateY(10px);filter:blur(14px)}
+      to {opacity:1;transform:none;filter:none}
       }
       .composer {
       width:min(780px,100%);
