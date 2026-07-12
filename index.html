@@ -419,6 +419,12 @@
       gap:7px;
       margin-top:24px
       }
+      .desktop-creations {
+      margin-top:24px
+      }
+      .desktop-creations .mini-grid {
+      margin-top:12px
+      }
       .mini {
       aspect-ratio:1;
       overflow:hidden;
@@ -1352,6 +1358,10 @@
           min-width:44px;
           height:44px !important;
         }
+        .desktop-creations,
+        body.mobile-app .desktop-creations {
+          display:none !important;
+        }
         .side,
         body.mobile-app .side {
           position:static !important;
@@ -1921,6 +1931,19 @@
                 </div>
               </div>
             </div>
+            <div class="chat-section desktop-creations">
+              <div class="chat-section-head">
+                <span>
+                  MY CREATIONS
+                </span>
+                <button data-go="library" title="See all creations">ALL</button>
+              </div>
+              <div class="mini-grid" id="sidebarCreations">
+                <div class="chat-empty">
+                  NO CREATIONS YET
+                </div>
+              </div>
+            </div>
           </aside>
         </div>
       </section>
@@ -1949,8 +1972,7 @@
               REMIX THE UNEXPECTED.
               <br>
               BE KIND TO FELLOW TRAVELERS.
-            </div>
-          </aside>
+            </div>          </aside>
         </div>
       </section>
       <section id="library" class="view">
